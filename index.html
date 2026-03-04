@@ -40,6 +40,7 @@
     --radius:10px; --radius-lg:16px;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
   body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow:hidden;}
 
   /* LOADING SCREEN */
@@ -233,6 +234,45 @@
   .tab.active{background:var(--gold-dim);color:var(--gold);font-weight:500;}
   .separator{height:1px;background:var(--border);margin:16px 0;}
   @media print{#loading-screen,#sidebar,.topbar,.modal-overlay,#toast{display:none!important;}.print-receipt{box-shadow:none;}}
+
+  /* ── RESPONSIVE MOBILE ── */
+  @media(max-width:768px){
+    body{flex-direction:column;overflow-y:auto;overflow-x:hidden;}
+    #sidebar{width:100%;height:auto;flex-direction:row;flex-shrink:0;border-right:none;border-bottom:1px solid var(--border);}
+    .logo{padding:10px 14px;border-bottom:none;border-right:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;}
+    .logo h1{font-size:14px;white-space:nowrap;}
+    .logo span{display:none;}
+    nav{flex-direction:row;padding:0;display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;flex:1;}
+    .nav-section{display:none;}
+    .nav-item{padding:12px 10px;border-left:none;border-bottom:3px solid transparent;flex-shrink:0;font-size:11px;white-space:nowrap;flex-direction:column;gap:2px;justify-content:center;}
+    .nav-item.active{border-left-color:transparent;border-bottom-color:var(--gold);background:var(--gold-dim);}
+    .nav-icon{font-size:14px;width:auto;}
+    .sidebar-footer{display:none;}
+    #main{flex:1;overflow:visible;min-height:0;}
+    #content{overflow:visible;padding:12px;flex:none;}
+    .grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}
+    .stat-value{font-size:20px;}
+    .topbar{padding:0 12px;height:46px;}
+    .topbar-title{font-size:14px;}
+    .order-layout{grid-template-columns:1fr;height:auto;gap:12px;}
+    .menu-grid{grid-template-columns:1fr 1fr;}
+    .form-row{grid-template-columns:1fr;}
+    .table-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:8px;}
+    .modal{width:97%;max-height:90vh;}
+    .modal-lg{max-width:97%;}
+    .tabs{flex-wrap:wrap;gap:4px;}
+    .section-header{flex-wrap:wrap;gap:8px;}
+    .input-search{width:120px;}
+    .data-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .chart-wrap{height:120px!important;}
+    .card{padding:14px;}
+    .stat-card{padding:14px;}
+  }
+  @media(min-width:769px) and (max-width:1100px){
+    .grid-4{grid-template-columns:1fr 1fr;}
+    .grid-3{grid-template-columns:1fr 1fr;}
+    #sidebar{width:190px;}
+  }
 </style>
 </head>
 <body>
@@ -458,19 +498,60 @@
 
     <!-- PERFORMANCE -->
     <div class="page" id="page-performance">
-      <div class="section-header"><div class="section-title">Tối ưu hóa hiệu suất</div></div>
-      <div class="grid grid-3" style="margin-bottom:16px">
-        <div class="stat-card gold"><div class="stat-label">Thời gian phục vụ TB</div><div class="stat-value" id="avg-time">--</div><div class="stat-sub">phút/bàn</div></div>
-        <div class="stat-card green"><div class="stat-label">Tỷ lệ lấp đầy</div><div class="stat-value" id="occupancy-rate" style="color:var(--green)">0%</div></div>
-        <div class="stat-card blue"><div class="stat-label">Doanh thu / Hóa đơn</div><div class="stat-value" id="rev-per-table" style="color:var(--blue);font-size:20px">0đ</div></div>
+      <div class="section-header">
+        <div class="section-title">Hiệu suất & Phân tích</div>
+        <!-- Period filter -->
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <div class="tabs" style="margin-bottom:0">
+            <div class="tab active" id="perf-tab-day"   onclick="switchPerfTab('day')">Hôm nay</div>
+            <div class="tab"        id="perf-tab-month" onclick="switchPerfTab('month')">Tháng này</div>
+            <div class="tab"        id="perf-tab-year"  onclick="switchPerfTab('year')">Năm nay</div>
+          </div>
+        </div>
       </div>
+
+      <!-- KPI thật từ Firebase -->
+      <div class="grid grid-4" style="margin-bottom:16px">
+        <div class="stat-card gold"><div class="stat-label" id="perf-rev-label">Doanh thu hôm nay</div><div class="stat-value" id="perf-revenue">0đ</div><div class="stat-sub" id="perf-bills-count">0 hóa đơn</div></div>
+        <div class="stat-card green"><div class="stat-label">TB / Hóa đơn</div><div class="stat-value" id="perf-avg-bill" style="color:var(--green);font-size:22px">0đ</div></div>
+        <div class="stat-card blue"><div class="stat-label">Tỷ lệ lấp đầy hiện tại</div><div class="stat-value" id="occupancy-rate" style="color:var(--blue)">0%</div></div>
+        <div class="stat-card red"><div class="stat-label">Tồn kho sắp hết</div><div class="stat-value" id="perf-low-stock" style="color:var(--red)">0</div><div class="stat-sub">mặt hàng</div></div>
+      </div>
+
+      <!-- Biểu đồ doanh thu theo kỳ + theo giờ -->
       <div class="grid grid-2" style="margin-bottom:16px">
-        <div class="card"><div class="card-title">Giờ cao điểm (ước tính)</div><div style="margin-top:12px" id="peak-hours"></div></div>
-        <div class="card"><div class="card-title">Hiệu suất theo ngày trong tuần</div><div class="chart-wrap" id="weekday-chart" style="height:140px;margin-top:10px"></div></div>
+        <div class="card">
+          <div class="card-title" id="perf-chart-title">Doanh thu theo giờ hôm nay</div>
+          <div class="chart-wrap" id="perf-rev-chart" style="height:160px;margin-top:8px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title" id="perf-weekday-title">Doanh thu theo thứ trong tuần</div>
+          <div class="chart-wrap" id="weekday-chart" style="height:160px;margin-top:8px"></div>
+        </div>
       </div>
+
+      <!-- Top món bán chạy + Top món sinh lời -->
+      <div class="grid grid-2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-title" id="perf-topsold-title">Top món bán chạy</div>
+          <div id="perf-top-sold" style="margin-top:10px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Top món sinh lời cao nhất</div>
+          <div id="staff-perf" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <!-- Giờ cao điểm thật + Gợi ý -->
       <div class="grid grid-2">
-        <div class="card"><div class="card-title">Gợi ý tối ưu hóa</div><div id="suggestions" style="margin-top:10px"></div></div>
-        <div class="card"><div class="card-title">Top món sinh lời</div><div id="staff-perf" style="margin-top:10px"></div></div>
+        <div class="card">
+          <div class="card-title">Giờ cao điểm (từ dữ liệu thực)</div>
+          <div style="margin-top:12px" id="peak-hours"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Gợi ý tối ưu hóa</div>
+          <div id="suggestions" style="margin-top:10px"></div>
+        </div>
       </div>
     </div>
 
@@ -751,6 +832,7 @@ function setupListeners() {
     if(S.currentPage==='orders') renderOrders();
     if(S.currentPage==='dashboard') renderDashboard();
     if(S.currentPage==='billing') renderBillingPage();
+    if(S.currentPage==='performance') renderPerformance();
   }));
 
   // Menu categories
@@ -784,6 +866,7 @@ function setupListeners() {
     if(S.currentPage==='billing') renderBillingPage();
     if(S.currentPage==='revenue') renderRevenue();
     if(S.currentPage==='dashboard') renderDashboard();
+    if(S.currentPage==='performance') renderPerformance();
   }));
 
   // Expenses
@@ -800,56 +883,71 @@ function setupListeners() {
 // ===== SEED DEFAULT DATA =====
 async function seedIfEmpty() {
   const {getDocs, collection: col} = fs;
+
+  // Check & seed tables
   const tabSnap = await getDocs(col(db,'tables'));
-  if(!tabSnap.empty) return; // Already seeded
-
-  document.getElementById('loading-msg').textContent = 'Khởi tạo dữ liệu mặc định...';
-
-  // Seed tables (20 bàn)
-  for(let i=1;i<=20;i++) {
-    await fbSet('tables','table-'+i,{num:i,name:'Bàn '+i,status:'empty',orderId:null});
+  if(tabSnap.empty) {
+    document.getElementById('loading-msg').textContent = 'Khởi tạo bàn...';
+    for(let i=1;i<=20;i++) {
+      await fbSet('tables','table-'+i,{num:i,name:'Bàn '+i,status:'empty',orderId:null,guests:0,note:''});
+    }
   }
 
-  // Seed categories
-  const cats = ['Món khai vị','Món chính','Canh & Lẩu','Đồ uống','Tráng miệng'];
-  for(let i=0;i<cats.length;i++) {
-    await fbSet('menuCategories','cat-'+(i+1),{name:cats[i],order:i+1});
+  // Check & seed categories — LUÔN kiểm tra độc lập
+  const catSnap = await getDocs(col(db,'menuCategories'));
+  if(catSnap.empty) {
+    document.getElementById('loading-msg').textContent = 'Khởi tạo danh mục thực đơn...';
+    const cats = ['Món khai vị','Món chính','Canh & Lẩu','Đồ uống','Tráng miệng'];
+    for(let i=0;i<cats.length;i++) {
+      await fbSet('menuCategories','cat-'+(i+1),{name:cats[i],order:i+1});
+    }
   }
 
-  // Seed menu items
-  const items = [
-    {name:'Gỏi cuốn tôm thịt',price:55000,cost:20000,category:'cat-1',status:'available',sold:0},
-    {name:'Chả giò chiên',price:65000,cost:22000,category:'cat-1',status:'available',sold:0},
-    {name:'Phở bò đặc biệt',price:95000,cost:35000,category:'cat-2',status:'available',sold:0},
-    {name:'Cơm tấm sườn bì',price:75000,cost:28000,category:'cat-2',status:'available',sold:0},
-    {name:'Bún bò Huế',price:85000,cost:30000,category:'cat-2',status:'available',sold:0},
-    {name:'Cá kho tộ',price:120000,cost:45000,category:'cat-2',status:'available',sold:0},
-    {name:'Gà nướng mật ong',price:145000,cost:55000,category:'cat-2',status:'available',sold:0},
-    {name:'Lẩu thái hải sản',price:350000,cost:130000,category:'cat-3',status:'available',sold:0},
-    {name:'Canh chua cá lóc',price:85000,cost:30000,category:'cat-3',status:'available',sold:0},
-    {name:'Nước chanh tươi',price:35000,cost:8000,category:'cat-4',status:'available',sold:0},
-    {name:'Trà đào cam sả',price:45000,cost:10000,category:'cat-4',status:'available',sold:0},
-    {name:'Bia Heineken',price:40000,cost:18000,category:'cat-4',status:'available',sold:0},
-    {name:'Chè ba màu',price:40000,cost:12000,category:'cat-5',status:'available',sold:0},
-    {name:'Kem chiên',price:55000,cost:18000,category:'cat-5',status:'available',sold:0},
-  ];
-  for(let i=0;i<items.length;i++) {
-    await fbSet('menuItems','item-'+(i+1),items[i]);
+  // Check & seed menu items — LUÔN kiểm tra độc lập
+  const itemSnap = await getDocs(col(db,'menuItems'));
+  if(itemSnap.empty) {
+    document.getElementById('loading-msg').textContent = 'Khởi tạo thực đơn mẫu...';
+    const items = [
+      {name:'Gỏi cuốn tôm thịt',price:55000,cost:20000,category:'cat-1',status:'available',sold:0},
+      {name:'Chả giò chiên',price:65000,cost:22000,category:'cat-1',status:'available',sold:0},
+      {name:'Súp cua bắp',price:45000,cost:15000,category:'cat-1',status:'available',sold:0},
+      {name:'Phở bò đặc biệt',price:95000,cost:35000,category:'cat-2',status:'available',sold:0},
+      {name:'Cơm tấm sườn bì',price:75000,cost:28000,category:'cat-2',status:'available',sold:0},
+      {name:'Bún bò Huế',price:85000,cost:30000,category:'cat-2',status:'available',sold:0},
+      {name:'Cá kho tộ',price:120000,cost:45000,category:'cat-2',status:'available',sold:0},
+      {name:'Gà nướng mật ong',price:145000,cost:55000,category:'cat-2',status:'available',sold:0},
+      {name:'Lẩu thái hải sản',price:350000,cost:130000,category:'cat-3',status:'available',sold:0},
+      {name:'Canh chua cá lóc',price:85000,cost:30000,category:'cat-3',status:'available',sold:0},
+      {name:'Canh khổ qua hầm',price:65000,cost:22000,category:'cat-3',status:'available',sold:0},
+      {name:'Nước chanh tươi',price:35000,cost:8000,category:'cat-4',status:'available',sold:0},
+      {name:'Trà đào cam sả',price:45000,cost:10000,category:'cat-4',status:'available',sold:0},
+      {name:'Bia Heineken',price:40000,cost:18000,category:'cat-4',status:'available',sold:0},
+      {name:'Nước ngọt lon',price:25000,cost:10000,category:'cat-4',status:'available',sold:0},
+      {name:'Chè ba màu',price:40000,cost:12000,category:'cat-5',status:'available',sold:0},
+      {name:'Kem chiên',price:55000,cost:18000,category:'cat-5',status:'available',sold:0},
+    ];
+    for(let i=0;i<items.length;i++) {
+      await fbSet('menuItems','item-'+(i+1),items[i]);
+    }
   }
 
-  // Seed inventory
-  const inv = [
-    {name:'Thịt bò',unit:'kg',qty:15,min:5,price:320000},
-    {name:'Thịt heo',unit:'kg',qty:20,min:8,price:180000},
-    {name:'Cá lóc',unit:'kg',qty:8,min:4,price:95000},
-    {name:'Tôm sú',unit:'kg',qty:3,min:3,price:320000},
-    {name:'Gạo tẻ',unit:'kg',qty:50,min:20,price:22000},
-    {name:'Rau xà lách',unit:'kg',qty:4,min:3,price:35000},
-    {name:'Bia Heineken',unit:'thùng',qty:5,min:3,price:420000},
-    {name:'Trứng gà',unit:'cái',qty:60,min:30,price:4500},
-  ];
-  for(let i=0;i<inv.length;i++) {
-    await fbAdd('inventory',inv[i]);
+  // Check & seed inventory
+  const invSnap = await getDocs(col(db,'inventory'));
+  if(invSnap.empty) {
+    document.getElementById('loading-msg').textContent = 'Khởi tạo tồn kho...';
+    const inv = [
+      {name:'Thịt bò',unit:'kg',qty:15,min:5,price:320000},
+      {name:'Thịt heo',unit:'kg',qty:20,min:8,price:180000},
+      {name:'Cá lóc',unit:'kg',qty:8,min:4,price:95000},
+      {name:'Tôm sú',unit:'kg',qty:3,min:3,price:320000},
+      {name:'Gạo tẻ',unit:'kg',qty:50,min:20,price:22000},
+      {name:'Rau xà lách',unit:'kg',qty:4,min:3,price:35000},
+      {name:'Bia Heineken',unit:'thùng',qty:5,min:3,price:420000},
+      {name:'Trứng gà',unit:'cái',qty:60,min:30,price:4500},
+    ];
+    for(let i=0;i<inv.length;i++) {
+      await fbAdd('inventory',inv[i]);
+    }
   }
 }
 
@@ -916,31 +1014,35 @@ function renderDashboard() {
   document.getElementById('dashboard-tables').innerHTML = S.tables.slice(0,15).map(t=>`
     <div onclick="openTableDetail('${t._id}')" style="background:var(--surface2);border:1.5px solid ${t.status==='occupied'?'var(--gold)':t.status==='bill'?'var(--red)':'var(--border)'};border-radius:8px;padding:8px;cursor:pointer;text-align:center;transition:all 0.15s"
     onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
-      <div style="font-family:'Playfair Display',serif;font-size:14px;color:${t.status==='occupied'?'var(--gold)':t.status==='bill'?'var(--red)':'var(--text-muted)'}">${t.num}</div>
+      <div style="font-family:'Playfair Display',serif;font-size:14px;color:${t.status==='occupied'?'var(--gold)':t.status==='bill'?'var(--red)':'var(--text-muted)'}">${t.name||t.num}</div>
       <div style="font-size:9px;color:var(--text-muted);margin-top:2px">${t.status==='occupied'?'🟡':t.status==='bill'?'🔴':'⚪'}</div>
     </div>`).join('');
 
+  // Biểu đồ 7 ngày — chỉ dùng data thật
   renderMiniChart('revenue-chart', generateRevData(7));
 
-  // Recent orders
-  document.getElementById('recent-orders').innerHTML = S.orders.slice(0,5).map(o=>`<tr>
+  // Recent orders — chỉ hiện đơn hôm nay trước, sau đó các ngày khác
+  const sortedOrders = [...S.orders].sort((a,b)=>b.time-a.time);
+  document.getElementById('recent-orders').innerHTML = sortedOrders.slice(0,6).map(o=>`<tr>
     <td>${o.tableName||'?'}</td>
-    <td style="color:var(--text-dim)">${(o.items||[]).slice(0,2).map(i=>i.name?.split(' ').slice(-1)[0]).join(', ')}${(o.items||[]).length>2?'...':''}</td>
-    <td class="no-wrap">${fmtTime(o.time)}</td>
+    <td style="color:var(--text-dim);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(o.items||[]).slice(0,2).map(i=>i.name?.split(' ').slice(-1)[0]).join(', ')}${(o.items||[]).length>2?'...':''}</td>
+    <td class="no-wrap" style="font-size:11px">${fmtTime(o.time)}</td>
     <td class="money no-wrap">${fmt(o.total||0)}</td>
     <td>${statusBadge(o.status)}</td>
-  </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Chưa có đơn hàng</td></tr>';
+  </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Chưa có đơn hàng</td></tr>';
 
-  // Top items
+  // Top items — tính từ tất cả orders có status active/bill/done
   const itemSales = {};
-  S.orders.forEach(o=>(o.items||[]).forEach(i=>{ itemSales[i.name]=(itemSales[i.name]||0)+i.qty; }));
-  const top = Object.entries(itemSales).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  S.orders.forEach(o=>(o.items||[]).forEach(i=>{
+    if(i.name) itemSales[i.name]=(itemSales[i.name]||0)+i.qty;
+  }));
+  const top = Object.entries(itemSales).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxSale = top[0]?.[1]||1;
   document.getElementById('top-items').innerHTML = top.length ? top.map(([name,qty])=>`
-    <div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${name}</span><span style="color:var(--gold)">${qty} suất</span></div>
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>${name}</span><span style="color:var(--gold);font-family:'DM Mono',monospace;font-size:12px">${qty} suất</span></div>
       <div class="inventory-bar"><div class="inventory-bar-fill" style="width:${qty/maxSale*100}%;background:var(--gold)"></div></div>
-    </div>`).join('') : '<div class="empty-state" style="padding:20px"><div>Chưa có dữ liệu</div></div>';
+    </div>`).join('') : '<div class="empty-state" style="padding:20px"><div>Chưa có dữ liệu bán hàng</div></div>';
 }
 
 function generateRevData(days) {
@@ -948,9 +1050,11 @@ function generateRevData(days) {
   for(let i=days-1;i>=0;i--) {
     const d=new Date(now.getTime()-i*86400000);
     const label=i===0?'Hôm nay':`${d.getDate()}/${d.getMonth()+1}`;
-    // Use real bills data for today, simulated for past
-    const dayBills = S.bills.filter(b=>{ const bd=b.time; return bd.getDate()===d.getDate()&&bd.getMonth()===d.getMonth()&&bd.getFullYear()===d.getFullYear(); });
-    const value = dayBills.length ? dayBills.reduce((s,b)=>s+b.total,0) : Math.round(2000000+Math.random()*4000000);
+    const dayBills = S.bills.filter(b=>{
+      const bd=b.time;
+      return bd.getDate()===d.getDate()&&bd.getMonth()===d.getMonth()&&bd.getFullYear()===d.getFullYear();
+    });
+    const value = dayBills.reduce((s,b)=>s+b.total,0); // chỉ dùng data thật, 0 nếu chưa có
     data.push({label,value});
   }
   return data;
@@ -1683,40 +1787,154 @@ async function deleteExpense(id) {
 }
 
 // ===== PERFORMANCE =====
+let perfTab = 'day';
+
+function switchPerfTab(tab) {
+  perfTab = tab;
+  ['day','month','year'].forEach(t=>{
+    document.getElementById('perf-tab-'+t)?.classList.toggle('active', t===tab);
+  });
+  renderPerformance();
+}
+
+function getPerfBills() {
+  const now = new Date();
+  if(perfTab==='day')   return S.bills.filter(b=>isToday(b.time));
+  if(perfTab==='month') return S.bills.filter(b=>b.time.getMonth()===now.getMonth()&&b.time.getFullYear()===now.getFullYear());
+  return S.bills.filter(b=>b.time.getFullYear()===now.getFullYear());
+}
+
+function getPerfOrders() {
+  const now = new Date();
+  if(perfTab==='day')   return S.orders.filter(o=>isToday(o.time));
+  if(perfTab==='month') return S.orders.filter(o=>o.time.getMonth()===now.getMonth()&&o.time.getFullYear()===now.getFullYear());
+  return S.orders.filter(o=>o.time.getFullYear()===now.getFullYear());
+}
+
 function renderPerformance() {
-  const serving=S.tables.filter(t=>t.status==='occupied'||t.status==='bill').length;
-  const occupancy=Math.round(serving/Math.max(S.tables.length,1)*100);
-  const todayBills=S.bills.filter(b=>isToday(b.time));
-  const todayRev=todayBills.reduce((s,b)=>s+b.total,0);
-  document.getElementById('avg-time').textContent='42';
-  document.getElementById('occupancy-rate').textContent=occupancy+'%';
-  document.getElementById('rev-per-table').textContent=fmt(todayBills.length?Math.round(todayRev/todayBills.length):0);
-  const hours=['10h','11h','12h','13h','14h','17h','18h','19h','20h','21h'];
-  const vals=[30,65,95,85,40,55,90,100,80,45];
-  document.getElementById('peak-hours').innerHTML=hours.map((h,i)=>`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <span style="font-size:12px;color:var(--text-muted);width:28px">${h}</span>
-      <div class="inventory-bar" style="flex:1"><div class="inventory-bar-fill" style="width:${vals[i]}%;background:${vals[i]>80?'var(--gold)':vals[i]>60?'var(--green)':'var(--blue)'}"></div></div>
-      <span style="font-size:11px;color:var(--text-dim);width:30px">${vals[i]}%</span>
-    </div>`).join('');
-  renderMiniChart('weekday-chart',['T2','T3','T4','T5','T6','T7','CN'].map((l,i)=>({label:l,value:[4200000,3800000,5100000,6200000,7800000,9500000,8100000][i]})));
-  const suggestions=[
-    {icon:'⚡',title:'Giờ cao điểm 18h-21h',desc:'Cần bổ sung thêm 2 nhân viên phục vụ',type:'warning'},
-    {icon:'📦',title:'Tồn kho thấp',desc:`${S.inventory.filter(i=>i.qty<=i.min).length} nguyên liệu sắp hết`,type:'error'},
-    {icon:'📈',title:'Thứ 7 và CN doanh thu cao nhất',desc:'Cân nhắc chạy combo cuối tuần',type:'info'},
-    {icon:'💡',title:'Dữ liệu realtime Firebase',desc:'Mọi thay đổi đồng bộ ngay lập tức',type:'success'},
-  ];
+  const bills  = getPerfBills();
+  const orders = getPerfOrders();
+  const rev    = bills.reduce((s,b)=>s+b.total,0);
+  const avgBill= bills.length ? Math.round(rev/bills.length) : 0;
+  const serving= S.tables.filter(t=>t.status==='occupied'||t.status==='bill').length;
+  const occupancy = Math.round(serving/Math.max(S.tables.length,1)*100);
+  const lowStock  = S.inventory.filter(i=>i.qty<=i.min).length;
+
+  const labels = {day:'Hôm nay', month:'Tháng này', year:'Năm nay'};
+  document.getElementById('perf-rev-label').textContent   = 'Doanh thu ' + labels[perfTab];
+  document.getElementById('perf-revenue').textContent     = fmt(rev);
+  document.getElementById('perf-bills-count').textContent = bills.length + ' hóa đơn';
+  document.getElementById('perf-avg-bill').textContent    = fmt(avgBill);
+  document.getElementById('occupancy-rate').textContent   = occupancy+'%';
+  document.getElementById('perf-low-stock').textContent   = lowStock;
+
+  // ── Biểu đồ theo kỳ ──
+  let chartData = [];
+  const now = new Date();
+  if(perfTab==='day') {
+    // theo giờ 6h–23h
+    document.getElementById('perf-chart-title').textContent = 'Doanh thu theo giờ hôm nay';
+    chartData = Array.from({length:18},(_,i)=>{
+      const h = i+6;
+      const val = bills.filter(b=>b.time.getHours()===h).reduce((s,b)=>s+b.total,0);
+      return {label:h+'h', value:val};
+    });
+  } else if(perfTab==='month') {
+    document.getElementById('perf-chart-title').textContent = 'Doanh thu theo ngày trong tháng';
+    const days = new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    chartData = Array.from({length:days},(_,i)=>{
+      const d=i+1;
+      const val=bills.filter(b=>b.time.getDate()===d).reduce((s,b)=>s+b.total,0);
+      return {label:d+'', value:val};
+    });
+  } else {
+    document.getElementById('perf-chart-title').textContent = 'Doanh thu theo tháng trong năm';
+    chartData = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'].map((label,mi)=>{
+      const val=bills.filter(b=>b.time.getMonth()===mi).reduce((s,b)=>s+b.total,0);
+      return {label, value:val};
+    });
+  }
+  renderMiniChart('perf-rev-chart', chartData);
+
+  // ── Biểu đồ theo thứ trong tuần (từ data thật) ──
+  document.getElementById('perf-weekday-title').textContent = 'Doanh thu theo thứ ' + labels[perfTab].toLowerCase();
+  const wdays = ['CN','T2','T3','T4','T5','T6','T7'];
+  const wdayLabels = ['CN','T2','T3','T4','T5','T6','T7'];
+  const wdayData = wdays.map((label,wi)=>{
+    const val = bills.filter(b=>b.time.getDay()===wi).reduce((s,b)=>s+b.total,0);
+    return {label, value:val};
+  });
+  // reorder Mon–Sun display
+  renderMiniChart('weekday-chart', [...wdayData.slice(1), wdayData[0]]);
+
+  // ── Top món bán chạy (từ orders trong kỳ) ──
+  document.getElementById('perf-topsold-title').textContent = 'Top món bán chạy ' + labels[perfTab].toLowerCase();
+  const itemSales = {};
+  orders.forEach(o=>(o.items||[]).forEach(i=>{
+    if(i.name) itemSales[i.name]=(itemSales[i.name]||0)+i.qty;
+  }));
+  const topSold = Object.entries(itemSales).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxSold = topSold[0]?.[1]||1;
+  document.getElementById('perf-top-sold').innerHTML = topSold.length
+    ? topSold.map(([name,qty])=>`
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
+            <span>${name}</span>
+            <span style="color:var(--gold);font-family:'DM Mono',monospace;font-size:12px">${qty} suất</span>
+          </div>
+          <div class="inventory-bar"><div class="inventory-bar-fill" style="width:${qty/maxSold*100}%;background:var(--gold)"></div></div>
+        </div>`).join('')
+    : '<div class="empty-state" style="padding:16px"><div>Chưa có đơn hàng trong kỳ này</div></div>';
+
+  // ── Top món sinh lời (từ menuItems) ──
+  const topProfit = S.menuItems
+    .filter(i=>i.price&&i.cost)
+    .map(i=>({
+      name:i.name,
+      margin:Math.round((i.price-i.cost)/i.price*100),
+      sold: orders.reduce((s,o)=>s+(o.items||[]).find(x=>x.id===i._id)?.qty||0, 0)
+    }))
+    .sort((a,b)=>b.margin-a.margin).slice(0,6);
+  document.getElementById('staff-perf').innerHTML = topProfit.length
+    ? topProfit.map(i=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:500">${i.name}</div>
+            <div style="font-size:11px;color:var(--text-muted)">Bán ${i.sold} suất ${labels[perfTab].toLowerCase()}</div>
+          </div>
+          <span style="color:var(--green);font-family:'DM Mono',monospace;font-size:13px;font-weight:600">+${i.margin}%</span>
+        </div>`).join('')
+    : '<div class="empty-state" style="padding:16px"><div>Chưa có dữ liệu</div></div>';
+
+  // ── Giờ cao điểm (từ bills thật) ──
+  const hourCounts = Array(24).fill(0);
+  bills.forEach(b=>{ hourCounts[b.time.getHours()]++; });
+  const maxHour = Math.max(...hourCounts, 1);
+  const busyHours = hourCounts.map((c,h)=>({h,c})).filter(x=>x.h>=8&&x.h<=23).sort((a,b)=>b.c-a.c);
+  document.getElementById('peak-hours').innerHTML = busyHours.slice(0,10).map(({h,c})=>{
+    const pct=Math.round(c/maxHour*100);
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="font-size:12px;color:var(--text-muted);width:32px">${h}h</span>
+      <div class="inventory-bar" style="flex:1"><div class="inventory-bar-fill" style="width:${pct||4}%;background:${pct>70?'var(--gold)':pct>40?'var(--green)':'var(--blue)'}"></div></div>
+      <span style="font-size:11px;color:var(--text-dim);width:50px">${c} hóa đơn</span>
+    </div>`;
+  }).join('') || '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">Chưa có dữ liệu hóa đơn</div>';
+
+  // ── Gợi ý thông minh từ data thật ──
+  const suggestions = [];
+  if(lowStock>0) suggestions.push({icon:'📦',title:`${lowStock} nguyên liệu sắp hết`,desc:'Vào Tồn kho để cập nhật và đặt hàng ngay',type:'error'});
+  if(bills.length===0) suggestions.push({icon:'🍽',title:'Chưa có hóa đơn trong kỳ này',desc:'Hãy tạo đơn hàng và tính tiền để xem thống kê',type:'info'});
+  if(avgBill>0&&avgBill<100000) suggestions.push({icon:'💡',title:'Giá trị đơn hàng còn thấp',desc:'Cân nhắc thêm combo hoặc upsell món tráng miệng',type:'warning'});
+  if(occupancy>70) suggestions.push({icon:'⚡',title:`Lấp đầy ${occupancy}% — Đang cao điểm`,desc:'Cân nhắc bổ sung nhân viên phục vụ',type:'warning'});
+  if(topSold[0]) suggestions.push({icon:'🏆',title:`"${topSold[0][0]}" bán chạy nhất`,desc:`${topSold[0][1]} suất trong kỳ này — Đảm bảo nguyên liệu đủ`,type:'success'});
+  if(rev>0) suggestions.push({icon:'📈',title:'Dữ liệu đồng bộ realtime',desc:`Tổng ${bills.length} hóa đơn · Doanh thu ${fmtFull(rev)}`,type:'success'});
+  if(!suggestions.length) suggestions.push({icon:'✅',title:'Mọi thứ ổn định',desc:'Không có cảnh báo nào. Chúc kinh doanh tốt!',type:'success'});
+
   const clrs={warning:'var(--orange)',error:'var(--red)',success:'var(--green)',info:'var(--blue)'};
   document.getElementById('suggestions').innerHTML=suggestions.map(s=>`
     <div style="display:flex;gap:10px;padding:10px;background:var(--surface2);border-radius:var(--radius);margin-bottom:8px;border-left:3px solid ${clrs[s.type]}">
-      <span style="font-size:18px">${s.icon}</span>
+      <span style="font-size:18px;flex-shrink:0">${s.icon}</span>
       <div><div style="font-size:13px;font-weight:600">${s.title}</div><div style="font-size:12px;color:var(--text-dim);margin-top:2px">${s.desc}</div></div>
-    </div>`).join('');
-  const topItems=S.menuItems.map(i=>({name:i.name,profit:(i.price||0)-(i.cost||0),margin:i.cost?Math.round(((i.price||0)-(i.cost||0))/(i.price||1)*100):0,sold:i.sold||0})).sort((a,b)=>b.margin-a.margin).slice(0,6);
-  document.getElementById('staff-perf').innerHTML=topItems.map(i=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div><div style="font-size:13px;font-weight:500">${i.name}</div><div style="font-size:11px;color:var(--text-muted)">Đã bán: ${i.sold} suất</div></div>
-      <span style="color:var(--green);font-family:'DM Mono',monospace;font-size:13px">+${i.margin}%</span>
     </div>`).join('');
 }
 
