@@ -233,7 +233,13 @@
   .tab:hover{color:var(--text);background:var(--surface2);}
   .tab.active{background:var(--gold-dim);color:var(--gold);font-weight:500;}
   .separator{height:1px;background:var(--border);margin:16px 0;}
-  @media print{#loading-screen,#sidebar,.topbar,.modal-overlay,#toast{display:none!important;}.print-receipt{box-shadow:none;}}
+  @media print{
+    #loading-screen,#sidebar,.topbar,.modal-overlay,#toast{display:none!important;}
+    .print-receipt{box-shadow:none;}
+    /* In 2 liên cạnh nhau trên 1 tờ A4 */
+    #receipt-content > div{display:flex!important;gap:0!important;justify-content:center;}
+    .print-receipt{width:48%;max-width:300px;font-size:11px;}
+  }
 
   /* ── RESPONSIVE MOBILE ── */
   @media(max-width:768px){
@@ -671,12 +677,17 @@
 
 <!-- PRINT MODAL -->
 <div class="modal-overlay" id="print-modal">
-  <div class="modal" style="max-width:360px">
-    <div class="modal-header"><h2>🖨 In hóa đơn</h2><button class="close-btn" onclick="closeModal('print-modal')">✕</button></div>
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h2>🖨 In hóa đơn — 2 liên</h2>
+      <button class="close-btn" onclick="closeModal('print-modal')">✕</button>
+    </div>
     <div class="modal-body"><div id="receipt-content"></div></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('print-modal')">Đóng</button>
-      <button class="btn btn-gold" onclick="window.print()">🖨 In ngay</button>
+      <button class="btn btn-ghost" onclick="printCopy('kitchen')">🖨 In liên lưu</button>
+      <button class="btn btn-ghost" onclick="printCopy('customer')">🖨 In liên khách</button>
+      <button class="btn btn-gold" onclick="window.print()">🖨 In cả 2 liên</button>
     </div>
   </div>
 </div>
@@ -1118,7 +1129,15 @@ function openTableDetail(tableId) {
     body.innerHTML=infoBar+`
       <div style="margin-bottom:12px"><div style="font-size:12px;color:var(--text-muted)">Giờ vào: ${fmtTime(order.time)} · Đơn #${order._id?.slice(-6)}</div></div>
       <table class="data-table"><thead><tr><th>Món</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
-      <tbody>${(order.items||[]).map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td class="money">${fmtFull(i.price)}</td><td class="money" style="color:var(--gold)">${fmtFull(i.price*i.qty)}</td></tr>`).join('')}</tbody></table>
+      <tbody>${(order.items||[]).map(i=>`<tr>
+        <td>
+          <div>${i.name}</div>
+          ${i.note?`<div style="font-size:11px;color:var(--gold);font-style:italic;margin-top:2px">📝 ${i.note}</div>`:''}
+        </td>
+        <td>${i.qty}</td>
+        <td class="money">${fmtFull(i.price)}</td>
+        <td class="money" style="color:var(--gold)">${fmtFull(i.price*i.qty)}</td>
+      </tr>`).join('')}</tbody></table>
       <div class="separator"></div>
       <div style="display:flex;flex-direction:column;gap:4px">
         <div class="total-row"><span>Tạm tính:</span><span class="money">${fmtFull(order.subtotal||0)}</span></div>
@@ -1244,7 +1263,7 @@ function renderOrderMenuItems() {
 function addToOrder(itemId, name, price) {
   const existing = S.currentOrder.find(i=>i.id===itemId);
   if(existing) existing.qty++;
-  else S.currentOrder.push({id:itemId, name, price, qty:1});
+  else S.currentOrder.push({id:itemId, name, price, qty:1, note:''});
   renderCurrentOrder();
 }
 
@@ -1256,20 +1275,52 @@ function changeQty(itemId, delta) {
   renderCurrentOrder();
 }
 
+function updateItemNote(itemId, val) {
+  const item = S.currentOrder.find(i=>i.id===itemId);
+  if(item) item.note = val;
+}
+
+function toggleItemNote(itemId) {
+  const el = document.getElementById('note-row-'+itemId);
+  if(!el) return;
+  const isHidden = el.style.display==='none'||!el.style.display;
+  el.style.display = isHidden ? 'flex' : 'none';
+  if(isHidden) el.querySelector('input')?.focus();
+}
+
 function renderCurrentOrder() {
   const container = document.getElementById('current-order-items');
   if(!S.currentOrder.length) {
     container.innerHTML='<div class="empty-state" style="padding:20px"><div class="icon">🍽</div><div>Chưa có món</div></div>';
   } else {
     container.innerHTML = S.currentOrder.map(i=>`
-      <div class="order-item">
-        <div class="order-item-name">${i.name}</div>
-        <div class="order-item-qty">
-          <button class="qty-btn" onclick="changeQty('${i.id}',-1)">−</button>
-          <span style="font-size:13px;min-width:16px;text-align:center">${i.qty}</span>
-          <button class="qty-btn" onclick="changeQty('${i.id}',1)">+</button>
+      <div class="order-item" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="order-item-name" style="flex:1">${i.name}</div>
+          <button onclick="toggleItemNote('${i.id}')" title="Ghi chú món"
+            style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:${i.note?'var(--gold)':'var(--text-muted)'};flex-shrink:0"
+            >📝</button>
+          <div class="order-item-qty">
+            <button class="qty-btn" onclick="changeQty('${i.id}',-1)">−</button>
+            <span style="font-size:13px;min-width:18px;text-align:center">${i.qty}</span>
+            <button class="qty-btn" onclick="changeQty('${i.id}',1)">+</button>
+          </div>
+          <div class="order-item-price" style="min-width:64px">${fmtFull(i.price*i.qty)}</div>
         </div>
-        <div class="order-item-price">${fmtFull(i.price*i.qty)}</div>
+        <!-- Note row — hiện khi click 📝 -->
+        <div id="note-row-${i.id}" style="display:${i.note?'flex':'none'};align-items:center;gap:6px;padding-left:4px">
+          <span style="font-size:11px;color:var(--text-muted);flex-shrink:0">📝</span>
+          <input
+            type="text"
+            value="${i.note||''}"
+            placeholder="VD: ít cay, không hành, thêm rau..."
+            oninput="updateItemNote('${i.id}',this.value)"
+            style="flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;outline:none;font-family:'DM Sans',sans-serif"
+            onfocus="this.style.borderColor='var(--gold)'"
+            onblur="this.style.borderColor='var(--border)'"
+          >
+        </div>
+        ${i.note?`<div style="font-size:11px;color:var(--gold);padding-left:20px;font-style:italic">${i.note}</div>`:''}
       </div>`).join('');
   }
   const sub = S.currentOrder.reduce((s,i)=>s+i.price*i.qty,0);
@@ -1301,14 +1352,22 @@ async function submitOrder() {
   const total = sub+vat;
   const note = document.getElementById('order-note').value;
 
+  // Lưu kèm ghi chú từng món
+  const itemsToSave = S.currentOrder.map(i=>({
+    id:i.id, name:i.name, price:i.price, qty:i.qty,
+    note: i.note||''   // ← ghi chú riêng từng món
+  }));
+
   // If table already has order, merge
   if(table.orderId) {
     const existingOrder = S.orders.find(o=>o._id===table.orderId);
     if(existingOrder) {
       const mergedItems = [...(existingOrder.items||[])];
-      S.currentOrder.forEach(newItem=>{
-        const ex = mergedItems.find(i=>i.id===newItem.id);
-        if(ex) ex.qty+=newItem.qty; else mergedItems.push({...newItem});
+      itemsToSave.forEach(newItem=>{
+        const ex = mergedItems.find(i=>i.id===newItem.id && i.note===newItem.note);
+        // Nếu cùng món + cùng ghi chú → gộp số lượng, khác ghi chú → thêm dòng mới
+        if(ex) ex.qty+=newItem.qty;
+        else mergedItems.push({...newItem});
       });
       const newSub = mergedItems.reduce((s,i)=>s+i.price*i.qty,0);
       const newVat = Math.round(newSub*0.08);
@@ -1318,7 +1377,7 @@ async function submitOrder() {
   } else {
     const orderId = await fbAdd('orders',{
       tableId, tableName:table.name,
-      items:S.currentOrder.map(i=>({...i})),
+      items: itemsToSave,
       note, time:fs.serverTimestamp(),
       subtotal:sub, vat, total, status:'active'
     });
@@ -1418,39 +1477,99 @@ function renderBillingPage() {
 }
 
 // ===== PRINT =====
+// Cấu hình ngân hàng — chỉnh thông tin này cho đúng nhà hàng
+const BANK_CONFIG = {
+  bankId:    'VCB',           // Mã ngân hàng VietQR: VCB, TCB, MBB, ACB, VTB, BIDV, TPB...
+  accountNo: '1234567890',    // Số tài khoản
+  accountName: 'HEM RESTAURANT', // Tên tài khoản
+  template:  'compact2'       // Template QR
+};
+
+function buildQRUrl(amount, desc) {
+  const encodedDesc = encodeURIComponent(desc);
+  return `https://img.vietqr.io/image/${BANK_CONFIG.bankId}-${BANK_CONFIG.accountNo}-${BANK_CONFIG.template}.png?amount=${amount}&addInfo=${encodedDesc}&accountName=${encodeURIComponent(BANK_CONFIG.accountName)}`;
+}
+
 function printReceipt() {
   const order = S.orders.find(o=>o._id===S.currentBillingOrderId); if(!order) return;
   const disc=parseFloat(document.getElementById('discount-input').value)||0;
   showReceipt(order, disc, S.selectedPayment);
 }
 
-function showReceipt(order, disc, payment) {
-  if(!order) return;
+function buildReceiptHTML(order, disc, payment, copy) {
+  // copy = 'kitchen' (liên lưu) | 'customer' (liên khách)
   const discAmt=Math.round((order.subtotal||0)*disc/100);
   const afterDisc=(order.subtotal||0)-discAmt;
   const vat=Math.round(afterDisc*0.08);
   const total=afterDisc+vat;
-  const payLabel=payment?{cash:'Tiền mặt',card:'Thẻ ngân hàng',transfer:'Chuyển khoản'}[payment]:'Chưa thanh toán';
-  document.getElementById('receipt-content').innerHTML=`
-    <div class="print-receipt">
-      <h2>🍽 HẺM RESTAURANT</h2>
-      <div class="sub">TP. Hồ Chí Minh<br>Hotline: 0912.345.678</div>
-      <hr class="print-divider">
-      <div class="print-row"><span>${order.tableName}</span><span>${fmtTime(order.time)}</span></div>
-      <div class="print-row"><span>Ngày:</span><span>${new Date().toLocaleDateString('vi-VN')}</span></div>
-      <hr class="print-divider">
-      ${(order.items||[]).map(i=>`
-        <div class="print-row"><span>${i.name}</span><span></span></div>
-        <div class="print-row" style="color:#555;padding-left:8px"><span>${i.qty} × ${fmtFull(i.price)}</span><span>${fmtFull(i.price*i.qty)}</span></div>
-      `).join('')}
-      <hr class="print-divider">
-      <div class="print-row"><span>Tạm tính:</span><span>${fmtFull(order.subtotal||0)}</span></div>
-      ${disc>0?`<div class="print-row"><span>Giảm giá (${disc}%):</span><span>-${fmtFull(discAmt)}</span></div>`:''}
-      <div class="print-row"><span>VAT (8%):</span><span>${fmtFull(vat)}</span></div>
-      <div class="print-row print-total"><span>TỔNG CỘNG</span><span>${fmtFull(total)}</span></div>
-      <hr class="print-divider">
-      <div class="print-row"><span>Thanh toán:</span><span>${payLabel}</span></div>
-      <div class="print-footer">Cảm ơn quý khách!<br>Hẹn gặp lại 🙏</div>
+  const payLabel={cash:'Tiền mặt',card:'Thẻ ngân hàng',transfer:'Chuyển khoản'}[payment]||'—';
+  const now = new Date();
+  const billNo = order._id?.slice(-8).toUpperCase();
+
+  const itemsHTML = (order.items||[]).map(i=>`
+    <div class="print-row"><span><b>${i.name}</b></span></div>
+    ${i.note?`<div style="font-size:10px;color:#777;padding-left:10px;margin-bottom:1px">└ ${i.note}</div>`:''}
+    <div class="print-row" style="color:#555;padding-left:10px;margin-bottom:6px">
+      <span>${i.qty} × ${fmtFull(i.price)}</span>
+      <span>${fmtFull(i.price*i.qty)}</span>
+    </div>`).join('');
+
+  const totalsHTML = `
+    <div class="print-row"><span>Tạm tính:</span><span>${fmtFull(order.subtotal||0)}</span></div>
+    ${disc>0?`<div class="print-row"><span>Giảm giá (${disc}%):</span><span style="color:#c00">-${fmtFull(discAmt)}</span></div>`:''}
+    <div class="print-row"><span>VAT (8%):</span><span>${fmtFull(vat)}</span></div>
+    <div class="print-row print-total"><span>TỔNG CỘNG</span><span>${fmtFull(total)}</span></div>`;
+
+  const qrSection = (copy==='customer' && payment==='transfer') ? `
+    <hr class="print-divider">
+    <div style="text-align:center;margin:10px 0">
+      <div style="font-size:11px;font-weight:600;margin-bottom:6px">📱 Quét QR để thanh toán</div>
+      <img src="${buildQRUrl(total, 'HD'+billNo+' '+order.tableName)}"
+        style="width:180px;height:180px;border:1px solid #eee;border-radius:8px"
+        onerror="this.style.display='none';this.nextSibling.style.display='block'"
+        alt="QR">
+      <div style="display:none;font-size:11px;color:#888;padding:10px">
+        ${BANK_CONFIG.bankId} – ${BANK_CONFIG.accountNo}<br>${BANK_CONFIG.accountName}
+      </div>
+      <div style="font-size:10px;color:#555;margin-top:6px">
+        ${BANK_CONFIG.bankId} · ${BANK_CONFIG.accountNo}<br>
+        <b>${fmtFull(total)}</b> · Nội dung: HD${billNo}
+      </div>
+    </div>` : (copy==='customer' ? `
+    <hr class="print-divider">
+    <div class="print-row"><span>Thanh toán:</span><span>${payLabel}</span></div>` : '');
+
+  const header = copy==='kitchen'
+    ? `<div style="text-align:center;font-size:10px;background:#f0f0f0;padding:4px;border-radius:4px;margin-bottom:8px;letter-spacing:1px">— LIÊN LƯU —</div>`
+    : `<div style="text-align:center;font-size:10px;background:#fff3cd;padding:4px;border-radius:4px;margin-bottom:8px;letter-spacing:1px">— LIÊN KHÁCH —</div>`;
+
+  return `<div class="print-receipt">
+    ${header}
+    <h2>🍽 HẺM RESTAURANT</h2>
+    <div class="sub">TP. Hồ Chí Minh · Hotline: 0912.345.678</div>
+    <hr class="print-divider">
+    <div class="print-row"><span><b>${order.tableName}</b></span><span>#${billNo}</span></div>
+    <div class="print-row"><span>${now.toLocaleDateString('vi-VN')}</span><span>${fmtTime(order.time)}</span></div>
+    <hr class="print-divider">
+    ${itemsHTML}
+    <hr class="print-divider">
+    ${totalsHTML}
+    ${qrSection}
+    <hr class="print-divider">
+    <div class="print-footer">Cảm ơn quý khách! 🙏<br>Hẹn gặp lại lần sau</div>
+  </div>`;
+}
+
+function showReceipt(order, disc, payment) {
+  if(!order) return;
+  const disc2 = disc ?? (parseFloat(document.getElementById('discount-input')?.value)||0);
+  const pay2  = payment ?? S.selectedPayment ?? 'cash';
+
+  document.getElementById('receipt-content').innerHTML = `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <div>${buildReceiptHTML(order, disc2, pay2, 'kitchen')}</div>
+      <div style="border-left:2px dashed #ddd;margin:0 4px"></div>
+      <div>${buildReceiptHTML(order, disc2, pay2, 'customer')}</div>
     </div>`;
   openModal('print-modal');
 }
@@ -1936,6 +2055,35 @@ function renderPerformance() {
       <span style="font-size:18px;flex-shrink:0">${s.icon}</span>
       <div><div style="font-size:13px;font-weight:600">${s.title}</div><div style="font-size:12px;color:var(--text-dim);margin-top:2px">${s.desc}</div></div>
     </div>`).join('');
+}
+
+// In từng liên riêng
+function printCopy(copy) {
+  const order = S.currentBillingOrderId
+    ? S.orders.find(o=>o._id===S.currentBillingOrderId)
+    : null;
+  if(!order) { window.print(); return; }
+  const disc=parseFloat(document.getElementById('discount-input')?.value)||0;
+  const pay=S.selectedPayment||'cash';
+  const html = buildReceiptHTML(order, disc, pay, copy);
+  const w = window.open('','_blank','width=380,height=600');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box;}
+      body{font-family:'DM Mono',monospace;font-size:12px;padding:8px;}
+      .print-receipt{max-width:300px;margin:0 auto;}
+      .print-receipt h2{text-align:center;font-size:16px;margin-bottom:4px;}
+      .sub{text-align:center;font-size:10px;color:#666;margin-bottom:12px;}
+      .print-divider{border:none;border-top:1px dashed #aaa;margin:8px 0;}
+      .print-row{display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;}
+      .print-total{font-weight:700;font-size:13px;border-top:2px solid #111;padding-top:6px;margin-top:6px;}
+      .print-footer{text-align:center;margin-top:12px;font-size:10px;color:#666;}
+      img{display:block;margin:0 auto;}
+    </style>
+  </head><body>${html}<script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
+  w.document.close();
 }
 
 // Close modals on overlay click
